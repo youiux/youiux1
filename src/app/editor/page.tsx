@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -9,22 +9,35 @@ export default function Editor() {
   const [activeTool, setActiveTool] = useState<string>("select");
   const [elements, setElements] = useState<any[]>([]);
   const [walletConnected, setWalletConnected] = useState<boolean>(false);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  
+  // Find the selected element
+  const selectedElement = elements.find(el => el.id === selectedElementId);
   
   const connectWallet = async () => {
-    // Mock implementation - would use actual web3 libraries in production
-    try {
-      console.log("Connecting wallet...");
-      // Simulate connection delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setWalletConnected(true);
-    } catch (error) {
-      console.error("Failed to connect wallet:", error);
+    // Check if window.ethereum is available
+    if (typeof window !== 'undefined' && window.ethereum) {
+      try {
+        setWalletConnected(false);
+        // Request account access
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        console.log("Connected wallet:", accounts[0]);
+        setWalletConnected(true);
+      } catch (error) {
+        console.error("Failed to connect wallet:", error);
+      }
+    } else {
+      alert("Please install MetaMask or another Web3 wallet to use this feature");
     }
   };
   
   const addElement = (type: string) => {
     const newElement = {
-      id: `element-${elements.length + 1}`,
+      id: `element-${Date.now()}`,
       type,
       x: 100,
       y: 100,
@@ -34,214 +47,201 @@ export default function Editor() {
       style: {
         backgroundColor: type === 'text' ? 'transparent' : '#e0e0e0',
         borderRadius: type === 'ellipse' ? '50%' : '0',
+        fontSize: '18px',
       }
     };
     
-    setElements([...elements, newElement]);
+    const newElements = [...elements, newElement];
+    setElements(newElements);
+    setSelectedElementId(newElement.id);
   };
   
   const generateWithAI = async () => {
-    // Mock AI implementation
-    console.log("Generating design with AI...");
-    // Add some mock elements after a delay
-    setTimeout(() => {
-      const aiElements = [
-        {
-          id: `ai-element-1`,
-          type: 'rectangle',
-          x: 50,
-          y: 50,
-          width: 300,
-          height: 200,
-          style: { backgroundColor: '#f0f9ff', borderRadius: '8px' }
-        },
-        {
-          id: `ai-element-2`,
-          type: 'text',
-          x: 100,
-          y: 120,
-          width: 200,
-          height: 50,
-          text: 'AI Generated Layout',
-          style: { fontSize: '18px', fontWeight: 'bold' }
-        }
-      ];
-      setElements([...elements, ...aiElements]);
-    }, 1000);
-  };
-
-  return (
-    <div className="flex flex-col h-screen">
-      {/* Top navigation */}
-      <header className="h-14 border-b flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/logo.svg"
-              alt="YouiUX Logo"
-              width={24}
-              height={24}
-              className="dark:invert"
-            />
-            <span className="font-bold">YouiUX</span>
-          </Link>
-          <span className="text-gray-400">|</span>
-          <button className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">File</button>
-          <button className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">Edit</button>
-          <button className="text-sm px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded">View</button>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <button 
-            onClick={generateWithAI}
-            className="text-sm px-3 py-1.5 bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-200 rounded flex items-center gap-1"
-          >
-            <span>AI Generate</span>
-          </button>
-          
-          <button 
-            onClick={connectWallet}
-            className={`text-sm px-3 py-1.5 rounded flex items-center gap-1 ${
-              walletConnected 
-                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-200' 
-                : 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200'
-            }`}
-          >
-            <span>{walletConnected ? 'Connected' : 'Connect Wallet'}</span>
-          </button>
-          
-          <button className="text-sm px-3 py-1.5 bg-black text-white dark:bg-white dark:text-black rounded">
-            Share
-          </button>
-        </div>
-      </header>
+    if (!aiPrompt.trim()) {
+      alert("Please enter a prompt for the AI");
+      return;
+    }
+    
+    setIsGeneratingAI(true);
+    
+    try {
+      // In a real implementation, make a call to an AI API (like OpenAI)
+      console.log("Generating design with AI prompt:", aiPrompt);
       
-      <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar - Tools */}
-        <div className="w-14 border-r flex flex-col items-center py-3 gap-3">
-          <button 
-            onClick={() => setActiveTool('select')}
-            className={`p-2 rounded ${activeTool === 'select' ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 3l7 7m0 0v-6m0 6h-6" />
-            </svg>
-          </button>
-          
-          <button 
-            onClick={() => {
-              setActiveTool('rectangle');
-              addElement('rectangle');
-            }}
-            className={`p-2 rounded ${activeTool === 'rectangle' ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-            </svg>
-          </button>
-          
-          <button 
-            onClick={() => {
-              setActiveTool('ellipse');
-              addElement('ellipse');
-            }}
-            className={`p-2 rounded ${activeTool === 'ellipse' ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-            </svg>
-          </button>
-          
-          <button 
-            onClick={() => {
-              setActiveTool('text');
-              addElement('text');
-            }}
-            className={`p-2 rounded ${activeTool === 'text' ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-
-          <div className="border-t w-8 my-2"></div>
-          
-          <button className="p-2 rounded" title="Export as NFT">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-            </svg>
-          </button>
-        </div>
-        
-        {/* Main canvas area */}
-        <div className="flex-1 bg-gray-100 dark:bg-gray-900 overflow-auto flex items-center justify-center">
-          <div 
-            ref={canvasRef}
-            className="bg-white dark:bg-gray-800 shadow-lg"
-            style={{ width: '1200px', height: '800px', position: 'relative' }}
-          >
-            {elements.map(element => (
-              <div
-                key={element.id}
-                style={{
-                  position: 'absolute',
-                  left: `${element.x}px`,
-                  top: `${element.y}px`,
-                  width: `${element.width}px`,
-                  height: `${element.height}px`,
-                  backgroundColor: element.style.backgroundColor,
-                  borderRadius: element.style.borderRadius,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'move',
-                  border: '1px solid transparent',
-                  borderColor: activeTool === 'select' ? '#3b82f6' : 'transparent'
-                }}
-              >
-                {element.type === 'text' && element.text}
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Right sidebar - Properties */}
-        <div className="w-64 border-l p-4 overflow-y-auto">
-          <h3 className="font-bold mb-3">Properties</h3>
-          
-          {activeTool === 'select' && elements.length > 0 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Position</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs">X</label>
-                    <input type="number" className="w-full border rounded px-2 py-1 text-sm" defaultValue="100" />
-                  </div>
-                  <div>
-                    <label className="text-xs">Y</label>
-                    <input type="number" className="w-full border rounded px-2 py-1 text-sm" defaultValue="100" />
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Size</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-xs">Width</label>
-                    <input type="number" className="w-full border rounded px-2 py-1 text-sm" defaultValue="200" />
-                  </div>
-                  <div>
-                    <label className="text-xs">Height</label>
-                    <input type="number" className="w-full border rounded px-2 py-1 text-sm" defaultValue="100" />
-                  </div>
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Style</label>
-                <div className="space-y-2">
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Generate some mock elements based on the prompt
+      const promptLower = aiPrompt.toLowerCase();
+      const aiElements = [];
+      
+      // Add a container element
+      aiElements.push({
+        id: `ai-container-${Date.now()}`,
+        type: 'rectangle',
+        x: 50,
+        y: 50,
+        width: 500,
+        height: 300,
+        style: { 
+          backgroundColor: promptLower.includes('dark') ? '#1a1a1a' : '#f8f9fa',
+          borderRadius: promptLower.includes('round') ? '12px' : '4px',
+        }
+      });
+      
+      // Add a title based on the prompt
+      aiElements.push({
+        id: `ai-title-${Date.now()}`,
+        type: 'text',
+        x: 80,
+        y: 80,
+        width: 440,
+        height: 50,
+        text: promptLower.includes('title') ? aiPrompt.replace('title', '').trim() : 'AI Generated Design',
+        style: { 
+          fontSize: '24px', 
+          fontWeight: 'bold',
+          color: promptLower.includes('dark') ? '#ffffff' : '#000000'
+        }
+      });
+      
+      // Add additional elements based on keywords
+      if (promptLower.includes('button')) {
+        aiElements.push({
+          id: `ai-button-${Date.now()}`,
+          type: 'rectangle',
+          x: 80,
+          y: 250,
+          width: 120,
+          height: 40,
+          style: { 
+            backgroundColor: '#3b82f6',
+            borderRadius: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            fontSize: '14px',
+            fontWeight: 'bold'
+          },
+          text: 'Click Me'
+        });
+      }
+      
+      if (promptLower.includes('image') || promptLower.includes('picture')) {
+        aiElements.push({
+          id: `ai-image-${Date.now()}`,
+          type: 'image',
+          x: 80,
+          y: 140,
+          width: 200,
+          height: 100,
+          style: { 
+            backgroundColor: '#e5e7eb',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6b7280',
+            fontSize: '12px'
+          },
+          text: 'Image Placeholder'
+        });
+      }
+      
+      setElements([...elements, ...aiElements]);
+      setAiPrompt("");
+    } catch (error) {
+      console.error("Error generating with AI:", error);
+      alert("Failed to generate design with AI");
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+  
+  const handleElementSelect = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (activeTool === 'select') {
+      setSelectedElementId(id);
+      
+      // Setup for drag
+      const element = elements.find(el => el.id === id);
+      if (element) {
+        setIsDragging(true);
+        setDragStart({ 
+          x: e.clientX - element.x, 
+          y: e.clientY - element.y 
+        });
+      }
+    }
+  };
+  
+  const handleCanvasClick = () => {
+    if (activeTool === 'select') {
+      setSelectedElementId(null);
+    }
+  };
+  
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isDragging && selectedElementId) {
+      const newElements = elements.map(el => {
+        if (el.id === selectedElementId) {
+          return {
+            ...el,
+            x: e.clientX - dragStart.x,
+            y: e.clientY - dragStart.y
+          };
+        }
+        return el;
+      });
+      setElements(newElements);
+    }
+  };
+  
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+  
+  const updateElementProperty = (property: string, value: any) => {
+    if (!selectedElementId) return;
+    
+    const newElements = elements.map(el => {
+      if (el.id === selectedElementId) {
+        if (property.startsWith('style.')) {
+          const styleProp = property.split('.')[1];
+          return {
+            ...el,
+            style: {
+              ...el.style,
+              [styleProp]: value
+            }
+          };
+        }
+        return {
+          ...el,
+          [property]: value
+        };
+      }
+      return el;
+    });
+    
+    setElements(newElements);
+  };
+  
+  const deleteSelectedElement = () => {
+    if (!selectedElementId) return;
+    setElements(elements.filter(el => el.id !== selectedElementId));
+    setSelectedElementId(null);
+  };
+  
+  const saveToIPFS = async () => {
+    if (!walletConnected) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    
+    try {
+      // In a real implementation, you would:
                   <div>
                     <label className="text-xs">Background</label>
                     <input type="color" className="w-full border rounded h-8" defaultValue="#e0e0e0" />
